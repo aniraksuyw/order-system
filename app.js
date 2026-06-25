@@ -8,7 +8,7 @@ const state = {
   orders: [],
 };
 
-const storageKey = "groupOrderState-menu-v3";
+const storageKey = "groupOrderState-menu-v4";
 
 const sampleMenu = `魚排飯	75
 油甘魚飯	110
@@ -608,14 +608,13 @@ function renderAll() {
   renderSummary();
 }
 
-function loadDefaultMenuIfNeeded() {
-  if (state.menuItems.length || state.published) return;
-
-  state.menuItems = parseMenuText(sampleMenu);
-  els.menuText.value = sampleMenu;
-}
-
 function publishOrder() {
+  if (!state.menuItems.length) {
+    showToast("請先貼上並解析菜單");
+    switchView("hostView");
+    return;
+  }
+
   state.shopName = els.shopName.value.trim() || "未命名店家";
   state.mealTime = els.mealTime.value;
   state.deadline = els.deadline.value;
@@ -808,7 +807,6 @@ els.orderForm.addEventListener("submit", (event) => {
 els.copyVendorBtn.addEventListener("click", () => copyText(els.vendorText.value, "店家訂單已複製"));
 
 loadState();
-loadDefaultMenuIfNeeded();
 renderAll();
 window.setInterval(renderOrderView, 30000);
 
