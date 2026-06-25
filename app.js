@@ -8,7 +8,7 @@ const state = {
   orders: [],
 };
 
-const storageKey = "groupOrderState-menu-v2";
+const storageKey = "groupOrderState-menu-v3";
 
 const sampleMenu = `魚排飯	75
 油甘魚飯	110
@@ -484,6 +484,7 @@ function renderOrderView() {
     els.orderShopName.textContent = "尚未建立團購單";
     els.orderNote.textContent = "主揪建立後，這裡會出現菜單與點餐欄位。";
     els.orderDeadline.textContent = "尚未建立";
+    els.orderForm.reset();
     els.customerName.value = "";
     els.customerNote.value = "";
     els.customerName.disabled = true;
