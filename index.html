@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>團餐快手</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Office group order</p>
+        <h1>團餐快手</h1>
+      </div>
+      <nav class="tabs" aria-label="主要功能">
+        <button class="tab active" data-view="hostView">主揪</button>
+        <button class="tab" data-view="orderView">同事點餐</button>
+        <button class="tab" data-view="summaryView">統計</button>
+      </nav>
+    </header>
+
+    <main>
+      <section id="hostView" class="view active" aria-labelledby="hostTitle">
+        <div class="layout host-layout">
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="section-kicker">Step 1</p>
+                <h2 id="hostTitle">建立團購</h2>
+              </div>
+              <button id="loadSampleBtn" class="ghost-btn" type="button">載入範例</button>
+            </div>
+
+            <div class="form-grid">
+              <label>
+                店家名稱
+                <input id="shopName" type="text" placeholder="例如：阿明便當" />
+              </label>
+              <label>
+                訂餐日期時間
+                <input id="mealTime" type="datetime-local" />
+              </label>
+              <label>
+                截止時間
+                <input id="deadline" type="datetime-local" />
+              </label>
+              <label class="wide">
+                取餐 / 付款備註
+                <input id="hostNote" type="text" placeholder="例如：12:10 一樓領餐，請先轉帳" />
+              </label>
+            </div>
+
+            <label class="upload-zone" for="menuFile">
+              <input id="menuFile" type="file" accept=".txt,.csv,.md,.json,image/*" />
+              <span>上傳菜單檔案</span>
+              <small>圖片會顯示預覽；你可以把轉好的菜單文字直接貼到下方文字框</small>
+            </label>
+
+            <div id="uploadStatus" class="upload-status hidden">
+              <div>
+                <strong id="uploadStatusTitle">準備上傳</strong>
+                <p id="uploadStatusText">上傳圖片後會顯示菜單預覽，文字可直接貼到下方。</p>
+              </div>
+            </div>
+            <label class="menu-text-label">
+              <span id="menuContentTitle">菜單文字</span>
+              <img id="menuPreview" class="menu-preview hidden" alt="菜單預覽" />
+              <textarea id="menuText" rows="12" placeholder="一行一個品項，例如：雞腿便當 120"></textarea>
+            </label>
+
+            <div class="actions">
+              <button id="parseMenuBtn" class="primary-btn" type="button">解析菜單</button>
+              <button id="recognizeMenuBtn" class="secondary-btn" type="button" disabled>辨識菜單</button>
+              <button id="resetBtn" class="secondary-btn" type="button">清空</button>
+            </div>
+            <button id="publishBtn" class="primary-btn full" type="button">產生團購單</button>
+            <div id="shareBox" class="share-box hidden">
+              <p>團購單已建立</p>
+              <code id="shareLink"></code>
+              <button id="copyShareBtn" class="secondary-btn" type="button">複製連結</button>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section id="orderView" class="view" aria-labelledby="orderTitle">
+        <div class="layout order-layout">
+          <section class="panel order-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="section-kicker">Order</p>
+                <h2 id="orderTitle">同事點餐</h2>
+              </div>
+              <span id="orderDeadline" class="pill">尚未建立</span>
+            </div>
+
+            <div class="shop-card">
+              <h3 id="orderShopName">尚未建立團購單</h3>
+              <p id="orderNote">主揪建立後，這裡會出現菜單與點餐欄位。</p>
+            </div>
+
+            <form id="orderForm" class="order-form">
+              <div class="form-grid">
+                <label>
+                  姓名
+                  <input id="customerName" required type="text" placeholder="王小明" />
+                </label>
+              </div>
+
+              <div id="orderItems" class="order-items"></div>
+
+              <label>
+                備註
+                <input id="customerNote" type="text" placeholder="少飯、不要辣、餐具等" />
+              </label>
+              <button class="primary-btn full" type="submit">送出點餐</button>
+            </form>
+          </section>
+        </div>
+      </section>
+
+      <section id="summaryView" class="view" aria-labelledby="summaryTitle">
+        <div class="layout two-col">
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="section-kicker">Summary</p>
+                <h2 id="summaryTitle">訂單統計</h2>
+              </div>
+              <span id="totalAmount" class="total">$0</span>
+            </div>
+            <div id="orderList" class="order-list empty">目前還沒有人點餐。</div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="section-kicker">Vendor copy</p>
+                <h2>給店家的訂單</h2>
+              </div>
+              <button id="copyVendorBtn" class="secondary-btn" type="button">複製</button>
+            </div>
+            <textarea id="vendorText" class="vendor-text" rows="18" readonly></textarea>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

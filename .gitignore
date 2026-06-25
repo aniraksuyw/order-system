@@ -1,0 +1,10 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Local runtime output
+*.log
+
+# Temporary files
+*.tmp
+*.bak
