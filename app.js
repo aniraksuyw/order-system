@@ -1,4 +1,5 @@
 const state = {
+  published: false,
   shopName: "",
   mealTime: "",
   deadline: "",
@@ -42,7 +43,6 @@ const els = {
   shopName: document.querySelector("#shopName"),
   mealTime: document.querySelector("#mealTime"),
   deadline: document.querySelector("#deadline"),
-  hostNote: document.querySelector("#hostNote"),
   menuFile: document.querySelector("#menuFile"),
   uploadStatus: document.querySelector("#uploadStatus"),
   uploadStatusTitle: document.querySelector("#uploadStatusTitle"),
@@ -92,6 +92,7 @@ function loadState() {
 
   try {
     Object.assign(state, JSON.parse(saved));
+    state.published = state.published === true;
   } catch {
     localStorage.removeItem(storageKey);
   }
@@ -372,7 +373,6 @@ function applyParsedItems(items, sourceLabel) {
   state.shopName = els.shopName.value.trim();
   state.mealTime = els.mealTime.value;
   state.deadline = els.deadline.value;
-  state.note = els.hostNote.value.trim();
   saveState();
   renderAll();
   setUploadStatus("已產生點餐選項", `${sourceLabel}：解析出 ${items.length} 個品項，可在右側確認。`);
@@ -444,7 +444,6 @@ function renderHostForm() {
   els.shopName.value = state.shopName;
   els.mealTime.value = state.mealTime || "";
   els.deadline.value = state.deadline;
-  els.hostNote.value = state.note;
 }
 
 function renderMenuItems() {
@@ -481,13 +480,26 @@ function escapeHtml(value) {
 }
 
 function renderOrderView() {
+  if (!state.published) {
+    els.orderShopName.textContent = "尚未建立團購單";
+    els.orderNote.textContent = "主揪建立後，這裡會出現菜單與點餐欄位。";
+    els.orderDeadline.textContent = "尚未建立";
+    els.customerName.value = "";
+    els.customerNote.value = "";
+    els.customerName.disabled = true;
+    els.customerNote.disabled = true;
+    els.submitOrderBtn.disabled = true;
+    els.submitOrderBtn.textContent = "尚未開放";
+    els.orderItems.innerHTML = `<p class="order-list empty">目前尚未開放點餐。</p>`;
+    return;
+  }
+
   els.orderShopName.textContent = state.shopName || "尚未建立團購單";
   const closed = isOrderClosed();
   const orderDetails = [
     state.mealTime ? `訂餐：${formatDateTime(state.mealTime)}` : "",
     state.deadline ? `截止：${formatDateTime(state.deadline)}` : "",
     closed ? "已截止" : "",
-    state.note,
   ].filter(Boolean);
   els.orderNote.textContent = orderDetails.length ? orderDetails.join("｜") : "主揪建立後，這裡會出現菜單與點餐欄位。";
   els.orderDeadline.textContent = closed
@@ -596,19 +608,17 @@ function renderAll() {
 }
 
 function loadDefaultMenuIfNeeded() {
-  if (state.menuItems.length) return;
+  if (state.menuItems.length || state.published) return;
 
-  state.shopName = state.shopName || "便當菜單";
   state.menuItems = parseMenuText(sampleMenu);
   els.menuText.value = sampleMenu;
-  saveState();
 }
 
 function publishOrder() {
   state.shopName = els.shopName.value.trim() || "未命名店家";
   state.mealTime = els.mealTime.value;
   state.deadline = els.deadline.value;
-  state.note = els.hostNote.value.trim();
+  state.published = true;
   saveState();
   renderAll();
 
@@ -637,15 +647,13 @@ els.loadSampleBtn.addEventListener("click", () => {
   els.shopName.value = "便當菜單";
   els.mealTime.value = "";
   els.deadline.value = "";
-  els.hostNote.value = "請填寫取餐與付款方式";
   els.menuText.value = sampleMenu;
   menuTextSource = "sample";
   state.shopName = els.shopName.value;
   state.mealTime = "";
   state.deadline = "";
-  state.note = els.hostNote.value;
+  state.published = false;
   state.menuItems = parseMenuText(sampleMenu);
-  saveState();
   renderAll();
   showTextMenu();
   showToast("菜單選項已載入");
@@ -731,7 +739,7 @@ if (els.addItemBtn) {
 els.publishBtn.addEventListener("click", publishOrder);
 
 els.resetBtn.addEventListener("click", () => {
-  Object.assign(state, { shopName: "", mealTime: "", deadline: "", note: "", menuItems: [], orders: [] });
+  Object.assign(state, { published: false, shopName: "", mealTime: "", deadline: "", note: "", menuItems: [], orders: [] });
   uploadedImageFile = null;
   menuTextSource = "manual";
   els.recognizeMenuBtn.disabled = true;
@@ -748,6 +756,12 @@ els.copyShareBtn.addEventListener("click", () => copyText(els.shareLink.textCont
 
 els.orderForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  if (!state.published) {
+    renderOrderView();
+    showToast("團購單尚未建立");
+    return;
+  }
+
   if (isOrderClosed()) {
     renderOrderView();
     showToast("點餐已截止");
