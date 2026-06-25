@@ -70,6 +70,7 @@ const els = {
   orderForm: document.querySelector("#orderForm"),
   customerName: document.querySelector("#customerName"),
   customerNote: document.querySelector("#customerNote"),
+  submitOrderBtn: document.querySelector("#submitOrderBtn"),
   orderItems: document.querySelector("#orderItems"),
   orderList: document.querySelector("#orderList"),
   totalAmount: document.querySelector("#totalAmount"),
@@ -102,6 +103,12 @@ function currency(value) {
 
 function formatDateTime(value, options = { dateStyle: "short", timeStyle: "short" }) {
   return value ? new Date(value).toLocaleString("zh-TW", options) : "";
+}
+
+function isOrderClosed() {
+  if (!state.deadline) return false;
+  const deadlineTime = new Date(state.deadline).getTime();
+  return Number.isFinite(deadlineTime) && Date.now() >= deadlineTime;
 }
 
 function showToast(message) {
@@ -475,18 +482,26 @@ function escapeHtml(value) {
 
 function renderOrderView() {
   els.orderShopName.textContent = state.shopName || "尚未建立團購單";
+  const closed = isOrderClosed();
   const orderDetails = [
     state.mealTime ? `訂餐：${formatDateTime(state.mealTime)}` : "",
     state.deadline ? `截止：${formatDateTime(state.deadline)}` : "",
+    closed ? "已截止" : "",
     state.note,
   ].filter(Boolean);
   els.orderNote.textContent = orderDetails.length ? orderDetails.join("｜") : "主揪建立後，這裡會出現菜單與點餐欄位。";
-  els.orderDeadline.textContent = state.mealTime
+  els.orderDeadline.textContent = closed
+    ? "已截止"
+    : state.mealTime
     ? `訂餐 ${formatDateTime(state.mealTime)}`
     : state.deadline
       ? `截止 ${formatDateTime(state.deadline)}`
       : "尚未建立";
   els.orderItems.innerHTML = "";
+  els.customerName.disabled = closed;
+  els.customerNote.disabled = closed;
+  els.submitOrderBtn.disabled = closed;
+  els.submitOrderBtn.textContent = closed ? "已截止" : "送出點餐";
 
   if (state.menuItems.length === 0) {
     els.orderItems.innerHTML = `<p class="order-list empty">目前沒有可點的品項。</p>`;
@@ -501,7 +516,7 @@ function renderOrderView() {
         <span class="item-name">${escapeHtml(item.name)}</span>
         <span class="item-meta">${escapeHtml(item.category)} · ${currency(item.price)}</span>
       </span>
-      <input type="number" min="0" value="0" data-order-item="${item.id}" aria-label="${escapeHtml(item.name)}數量" />
+      <input type="number" min="0" value="0" data-order-item="${item.id}" aria-label="${escapeHtml(item.name)}數量" ${closed ? "disabled" : ""} />
     `;
     els.orderItems.append(card);
   });
@@ -733,6 +748,12 @@ els.copyShareBtn.addEventListener("click", () => copyText(els.shareLink.textCont
 
 els.orderForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  if (isOrderClosed()) {
+    renderOrderView();
+    showToast("點餐已截止");
+    return;
+  }
+
   const selected = Array.from(document.querySelectorAll("[data-order-item]"))
     .map((input) => {
       const quantity = Number(input.value);
@@ -774,6 +795,7 @@ els.copyVendorBtn.addEventListener("click", () => copyText(els.vendorText.value,
 loadState();
 loadDefaultMenuIfNeeded();
 renderAll();
+window.setInterval(renderOrderView, 30000);
 
 if (window.location.hash === "#order") {
   switchView("orderView");
