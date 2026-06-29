@@ -46,7 +46,13 @@ const els = {
   views: document.querySelectorAll(".view"),
   shopName: document.querySelector("#shopName"),
   mealTime: document.querySelector("#mealTime"),
+  mealDate: document.querySelector("#mealDate"),
+  mealHour: document.querySelector("#mealHour"),
+  mealMinute: document.querySelector("#mealMinute"),
   deadline: document.querySelector("#deadline"),
+  deadlineDate: document.querySelector("#deadlineDate"),
+  deadlineHour: document.querySelector("#deadlineHour"),
+  deadlineMinute: document.querySelector("#deadlineMinute"),
   menuFile: document.querySelector("#menuFile"),
   uploadStatus: document.querySelector("#uploadStatus"),
   uploadStatusTitle: document.querySelector("#uploadStatusTitle"),
@@ -401,6 +407,73 @@ function snapDateTimeToQuarterHour(input) {
   input.value = formatDateTimeInputValue(date);
 }
 
+function populateHourSelect(select) {
+  select.innerHTML = '<option value="">時</option>';
+  for (let hour = 0; hour < 24; hour += 1) {
+    const value = String(hour).padStart(2, "0");
+    select.insertAdjacentHTML("beforeend", `<option value="${value}">${value}</option>`);
+  }
+}
+
+function populateTimeSelectors() {
+  populateHourSelect(els.mealHour);
+  populateHourSelect(els.deadlineHour);
+}
+
+function getDateTimePartsValue(dateInput, hourSelect, minuteSelect) {
+  const date = dateInput.value;
+  const hour = hourSelect.value;
+  const minute = minuteSelect.value;
+  if (!date || !hour || !minute) return "";
+  return `${date}T${hour}:${minute}`;
+}
+
+function getMealTimeValue() {
+  return getDateTimePartsValue(els.mealDate, els.mealHour, els.mealMinute);
+}
+
+function getDeadlineValue() {
+  return getDateTimePartsValue(els.deadlineDate, els.deadlineHour, els.deadlineMinute);
+}
+
+function syncMealTimeFromParts() {
+  els.mealTime.value = getMealTimeValue();
+  state.mealTime = els.mealTime.value;
+  saveState();
+}
+
+function syncDeadlineFromParts() {
+  els.deadline.value = getDeadlineValue();
+  state.deadline = els.deadline.value;
+  saveState();
+}
+
+function renderDateTimeParts(value, hiddenInput, dateInput, hourSelect, minuteSelect) {
+  if (!value) {
+    hiddenInput.value = "";
+    dateInput.value = "";
+    hourSelect.value = "";
+    minuteSelect.value = "";
+    return;
+  }
+
+  const [datePart, timePart = ""] = value.split("T");
+  const [hour = "", minute = ""] = timePart.split(":");
+  hiddenInput.value = value;
+  dateInput.value = datePart || "";
+  hourSelect.value = hour.padStart(2, "0");
+  minuteSelect.value = ["00", "15", "30", "45"].includes(minute) ? minute : "00";
+  hiddenInput.value = getDateTimePartsValue(dateInput, hourSelect, minuteSelect);
+}
+
+function renderMealTimeParts(value) {
+  renderDateTimeParts(value, els.mealTime, els.mealDate, els.mealHour, els.mealMinute);
+}
+
+function renderDeadlineParts(value) {
+  renderDateTimeParts(value, els.deadline, els.deadlineDate, els.deadlineHour, els.deadlineMinute);
+}
+
 function isOrderClosed() {
   if (!state.deadline) return false;
   const deadlineTime = new Date(state.deadline).getTime();
@@ -679,8 +752,8 @@ function applyParsedItems(items, sourceLabel) {
 
   state.menuItems = items;
   state.shopName = els.shopName.value.trim();
-  state.mealTime = els.mealTime.value;
-  state.deadline = els.deadline.value;
+  state.mealTime = getMealTimeValue();
+  state.deadline = getDeadlineValue();
   saveState();
   renderAll();
   setUploadStatus("已產生點餐選項", `${sourceLabel}：解析出 ${items.length} 個品項，可在右側確認。`);
@@ -750,8 +823,8 @@ async function recognizeUploadedMenu() {
 
 function renderHostForm() {
   els.shopName.value = state.shopName;
-  els.mealTime.value = state.mealTime || "";
-  els.deadline.value = state.deadline;
+  renderMealTimeParts(state.mealTime || "");
+  renderDeadlineParts(state.deadline || "");
 }
 
 function renderMenuItems() {
@@ -924,8 +997,8 @@ async function publishOrder() {
   }
 
   state.shopName = els.shopName.value.trim() || "未命名店家";
-  state.mealTime = els.mealTime.value;
-  state.deadline = els.deadline.value;
+  state.mealTime = getMealTimeValue();
+  state.deadline = getDeadlineValue();
   state.published = true;
 
   try {
@@ -975,8 +1048,8 @@ els.tabs.forEach((tab) => {
 
 els.loadSampleBtn.addEventListener("click", () => {
   els.shopName.value = "便當菜單";
-  els.mealTime.value = "";
-  els.deadline.value = "";
+  renderMealTimeParts("");
+  renderDeadlineParts("");
   els.menuText.value = sampleMenu;
   menuTextSource = "sample";
   state.shopName = els.shopName.value;
@@ -1084,17 +1157,12 @@ els.resetBtn.addEventListener("click", () => {
 
 els.copyShareBtn.addEventListener("click", () => copyText(els.shareLink.textContent, "連結已複製"));
 
-els.mealTime.addEventListener("change", () => {
-  snapDateTimeToQuarterHour(els.mealTime);
-  state.mealTime = els.mealTime.value;
-  saveState();
-});
-
-els.mealTime.addEventListener("blur", () => {
-  snapDateTimeToQuarterHour(els.mealTime);
-  state.mealTime = els.mealTime.value;
-  saveState();
-});
+els.mealDate.addEventListener("change", syncMealTimeFromParts);
+els.mealHour.addEventListener("change", syncMealTimeFromParts);
+els.mealMinute.addEventListener("change", syncMealTimeFromParts);
+els.deadlineDate.addEventListener("change", syncDeadlineFromParts);
+els.deadlineHour.addEventListener("change", syncDeadlineFromParts);
+els.deadlineMinute.addEventListener("change", syncDeadlineFromParts);
 
 els.orderForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -1160,6 +1228,7 @@ els.orderForm.addEventListener("submit", async (event) => {
 els.copyVendorBtn.addEventListener("click", () => copyText(els.vendorText.value, "店家訂單已複製"));
 
 async function startApp() {
+  populateTimeSelectors();
   setGuestMode(isSharedOrderUrl());
   const loadedFromSharedLink = await loadSharedOrderFromUrl();
   if (!loadedFromSharedLink) {

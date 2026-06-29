@@ -38,11 +38,33 @@
               </label>
               <label>
                 訂餐日期時間
-                <input id="mealTime" type="datetime-local" step="900" />
+                <input id="mealTime" type="hidden" />
+                <div class="time-parts">
+                  <input id="mealDate" type="date" aria-label="訂餐日期" />
+                  <select id="mealHour" aria-label="訂餐小時"></select>
+                  <select id="mealMinute" aria-label="訂餐分鐘">
+                    <option value="">分</option>
+                    <option value="00">00</option>
+                    <option value="15">15</option>
+                    <option value="30">30</option>
+                    <option value="45">45</option>
+                  </select>
+                </div>
               </label>
               <label>
                 截止時間
-                <input id="deadline" type="datetime-local" />
+                <input id="deadline" type="hidden" />
+                <div class="time-parts">
+                  <input id="deadlineDate" type="date" aria-label="截止日期" />
+                  <select id="deadlineHour" aria-label="截止小時"></select>
+                  <select id="deadlineMinute" aria-label="截止分鐘">
+                    <option value="">分</option>
+                    <option value="00">00</option>
+                    <option value="15">15</option>
+                    <option value="30">30</option>
+                    <option value="45">45</option>
+                  </select>
+                </div>
               </label>
             </div>
 
