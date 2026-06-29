@@ -85,6 +85,7 @@ const els = {
 
 let uploadedImageFile = null;
 let menuTextSource = "manual";
+let isGuestMode = false;
 
 function saveState() {
   localStorage.setItem(storageKey, JSON.stringify(state));
@@ -407,8 +408,16 @@ function showImageMenu() {
 }
 
 function switchView(viewId) {
+  if (isGuestMode && viewId === "hostView") {
+    viewId = "orderView";
+  }
   els.tabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.view === viewId));
   els.views.forEach((view) => view.classList.toggle("active", view.id === viewId));
+}
+
+function setGuestMode(enabled) {
+  isGuestMode = enabled;
+  document.body.classList.toggle("guest-mode", enabled);
 }
 
 function guessCategory(name) {
@@ -1107,6 +1116,7 @@ els.copyVendorBtn.addEventListener("click", () => copyText(els.vendorText.value,
 
 async function startApp() {
   const loadedFromSharedLink = await loadSharedOrderFromUrl();
+  setGuestMode(loadedFromSharedLink);
   if (!loadedFromSharedLink) {
     loadState();
   }

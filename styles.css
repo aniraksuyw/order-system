@@ -125,6 +125,14 @@ h2 {
   transform: translateY(-1px);
 }
 
+.guest-mode .tab[data-view="hostView"] {
+  display: none;
+}
+
+.guest-mode .tabs {
+  grid-template-columns: repeat(2, minmax(86px, 1fr));
+}
+
 main {
   padding: 0 clamp(18px, 4vw, 56px) 44px;
 }
