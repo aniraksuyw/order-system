@@ -1,5 +1,6 @@
 const state = {
   published: false,
+  groupOrderId: "",
   shopName: "",
   mealTime: "",
   deadline: "",
@@ -8,7 +9,10 @@ const state = {
   orders: [],
 };
 
-const storageKey = "groupOrderState-menu-v4";
+const storageKey = "groupOrderState-menu-v5";
+const supabaseUrl = "https://rzevfusjlenwswmajxbh.supabase.co";
+const supabaseKey = "sb_publishable_Hzv-DwQgJc_s5ACJPko4EA_Uj2Cjwsd";
+const db = window.supabase ? window.supabase.createClient(supabaseUrl, supabaseKey) : null;
 
 const sampleMenu = `魚排飯	75
 油甘魚飯	110
@@ -161,6 +165,157 @@ function buildSharePayload() {
   };
 }
 
+function buildShortOrderUrl(groupOrderId) {
+  const url = new URL(window.location.href);
+  url.search = `?g=${encodeURIComponent(groupOrderId)}`;
+  url.hash = "order";
+  return url.toString();
+}
+
+async function createRemoteGroupOrder() {
+  if (!db) throw new Error("Supabase client is not available");
+
+  const { data: groupOrder, error: groupError } = await db
+    .from("group_orders")
+    .insert({
+      shop_name: state.shopName,
+      meal_time: state.mealTime || null,
+      deadline: state.deadline || null,
+    })
+    .select("id")
+    .single();
+
+  if (groupError) throw groupError;
+
+  const menuRows = state.menuItems.map((item, index) => ({
+    group_order_id: groupOrder.id,
+    name: item.name,
+    category: item.category,
+    price: item.price,
+    sort_order: index,
+  }));
+
+  const { data: menuItems, error: menuError } = await db
+    .from("menu_items")
+    .insert(menuRows)
+    .select("id,name,category,price");
+
+  if (menuError) throw menuError;
+
+  state.groupOrderId = groupOrder.id;
+  state.menuItems = menuItems.map((item) => ({
+    id: item.id,
+    name: item.name,
+    category: item.category,
+    price: item.price,
+  }));
+}
+
+async function loadRemoteGroupOrder(groupOrderId) {
+  if (!db) throw new Error("Supabase client is not available");
+
+  const { data: groupOrder, error: groupError } = await db
+    .from("group_orders")
+    .select("id,shop_name,meal_time,deadline")
+    .eq("id", groupOrderId)
+    .single();
+
+  if (groupError) throw groupError;
+
+  const { data: menuItems, error: menuError } = await db
+    .from("menu_items")
+    .select("id,name,category,price,sort_order")
+    .eq("group_order_id", groupOrderId)
+    .order("sort_order", { ascending: true });
+
+  if (menuError) throw menuError;
+
+  Object.assign(state, {
+    published: true,
+    groupOrderId,
+    shopName: groupOrder.shop_name || "",
+    mealTime: groupOrder.meal_time || "",
+    deadline: groupOrder.deadline || "",
+    note: "",
+    menuItems: menuItems.map((item) => ({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      price: item.price,
+    })),
+    orders: [],
+  });
+  saveState();
+}
+
+async function fetchRemoteOrders() {
+  if (!db || !state.groupOrderId) return;
+
+  const { data: orders, error: orderError } = await db
+    .from("orders")
+    .select("id,customer_name,note,created_at")
+    .eq("group_order_id", state.groupOrderId)
+    .order("created_at", { ascending: true });
+
+  if (orderError) throw orderError;
+
+  if (!orders.length) {
+    state.orders = [];
+    return;
+  }
+
+  const orderIds = orders.map((order) => order.id);
+  const { data: orderItems, error: itemError } = await db
+    .from("order_items")
+    .select("order_id,item_name,category,quantity,price")
+    .in("order_id", orderIds);
+
+  if (itemError) throw itemError;
+
+  state.orders = orders.map((order) => ({
+    id: order.id,
+    name: order.customer_name,
+    note: order.note || "",
+    createdAt: order.created_at,
+    items: orderItems
+      .filter((item) => item.order_id === order.id)
+      .map((item) => ({
+        name: item.item_name,
+        category: item.category,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+  }));
+}
+
+async function saveRemoteOrder(order) {
+  if (!db || !state.groupOrderId) return;
+
+  const { data: remoteOrder, error: orderError } = await db
+    .from("orders")
+    .insert({
+      group_order_id: state.groupOrderId,
+      customer_name: order.name,
+      note: order.note || null,
+    })
+    .select("id")
+    .single();
+
+  if (orderError) throw orderError;
+
+  const rows = order.items.map((item) => ({
+    order_id: remoteOrder.id,
+    menu_item_id: item.id && item.id.startsWith("shared-") ? null : item.id,
+    item_name: item.name,
+    category: item.category,
+    quantity: item.quantity,
+    price: item.price,
+  }));
+
+  const { error: itemError } = await db.from("order_items").insert(rows);
+  if (itemError) throw itemError;
+}
+
 function applySharedOrder(sharedOrder) {
   Object.assign(state, {
     published: true,
@@ -174,7 +329,18 @@ function applySharedOrder(sharedOrder) {
   saveState();
 }
 
-function loadSharedOrderFromUrl() {
+async function loadSharedOrderFromUrl() {
+  const queryGroupId = new URLSearchParams(window.location.search).get("g");
+  if (queryGroupId) {
+    try {
+      await loadRemoteGroupOrder(queryGroupId);
+      return true;
+    } catch {
+      showToast("團購資料讀取失敗");
+      return false;
+    }
+  }
+
   const queryOrder = new URLSearchParams(window.location.search).get("order");
   if (queryOrder) {
     try {
@@ -709,7 +875,7 @@ function renderAll() {
   renderSummary();
 }
 
-function publishOrder() {
+async function publishOrder() {
   if (!state.menuItems.length) {
     showToast("請先貼上並解析菜單");
     switchView("hostView");
@@ -720,14 +886,21 @@ function publishOrder() {
   state.mealTime = els.mealTime.value;
   state.deadline = els.deadline.value;
   state.published = true;
-  saveState();
-  renderAll();
 
   try {
-    const url = new URL(window.location.href);
-    url.search = `?order=${encodeShareData(buildSharePayload())}`;
-    url.hash = "order";
-    els.shareLink.textContent = url.toString();
+    try {
+      await createRemoteGroupOrder();
+      els.shareLink.textContent = buildShortOrderUrl(state.groupOrderId);
+    } catch {
+      const url = new URL(window.location.href);
+      url.search = `?order=${encodeShareData(buildSharePayload())}`;
+      url.hash = "order";
+      els.shareLink.textContent = url.toString();
+      showToast("Supabase 尚未可用，暫用長連結");
+    }
+
+    saveState();
+    renderAll();
     els.shareBox.classList.remove("hidden");
     switchView("orderView");
     showToast("團購單已建立");
@@ -746,7 +919,17 @@ async function copyText(text, message) {
 }
 
 els.tabs.forEach((tab) => {
-  tab.addEventListener("click", () => switchView(tab.dataset.view));
+  tab.addEventListener("click", async () => {
+    if (tab.dataset.view === "summaryView") {
+      try {
+        await fetchRemoteOrders();
+        renderSummary();
+      } catch {
+        showToast("雲端訂單讀取失敗");
+      }
+    }
+    switchView(tab.dataset.view);
+  });
 });
 
 els.loadSampleBtn.addEventListener("click", () => {
@@ -860,7 +1043,7 @@ els.resetBtn.addEventListener("click", () => {
 
 els.copyShareBtn.addEventListener("click", () => copyText(els.shareLink.textContent, "連結已複製"));
 
-els.orderForm.addEventListener("submit", (event) => {
+els.orderForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!state.published) {
     renderOrderView();
@@ -892,13 +1075,21 @@ els.orderForm.addEventListener("submit", (event) => {
     return;
   }
 
-  state.orders.push({
+  const order = {
     id: createId(),
     name: els.customerName.value.trim(),
     note: els.customerNote.value.trim(),
     items: selected,
     createdAt: new Date().toISOString(),
-  });
+  };
+
+  try {
+    await saveRemoteOrder(order);
+    await fetchRemoteOrders();
+  } catch {
+    state.orders.push(order);
+    showToast("雲端儲存失敗，已暫存在本機");
+  }
 
   els.orderForm.reset();
   document.querySelectorAll("[data-order-item]").forEach((input) => {
@@ -912,13 +1103,26 @@ els.orderForm.addEventListener("submit", (event) => {
 
 els.copyVendorBtn.addEventListener("click", () => copyText(els.vendorText.value, "店家訂單已複製"));
 
-const loadedFromSharedLink = loadSharedOrderFromUrl();
-if (!loadedFromSharedLink) {
-  loadState();
-}
-renderAll();
-window.setInterval(renderOrderView, 30000);
+async function startApp() {
+  const loadedFromSharedLink = await loadSharedOrderFromUrl();
+  if (!loadedFromSharedLink) {
+    loadState();
+  }
 
-if (loadedFromSharedLink || window.location.hash.startsWith("#order")) {
-  switchView("orderView");
+  if (state.groupOrderId) {
+    try {
+      await fetchRemoteOrders();
+    } catch {
+      // Keep local orders if the cloud read fails.
+    }
+  }
+
+  renderAll();
+  window.setInterval(renderOrderView, 30000);
+
+  if (loadedFromSharedLink || window.location.hash.startsWith("#order")) {
+    switchView("orderView");
+  }
 }
+
+startApp();
