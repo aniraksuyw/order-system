@@ -99,12 +99,42 @@ function loadState() {
 }
 
 function encodeShareData(data) {
-  return JSON.stringify(data);
+  const compact = {
+    s: data.shopName,
+    m: data.mealTime,
+    d: data.deadline,
+    i: data.menuItems.map((item) => [item.name, item.price, item.category]),
+  };
+  const json = JSON.stringify(compact);
+  const bytes = new TextEncoder().encode(json);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
 function decodeShareData(value) {
   try {
-    return JSON.parse(value);
+    const base64 = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+    const binary = atob(base64);
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    const compact = JSON.parse(new TextDecoder().decode(bytes));
+    if (compact.i) {
+      return {
+        published: true,
+        shopName: compact.s || "",
+        mealTime: compact.m || "",
+        deadline: compact.d || "",
+        menuItems: compact.i.map(([name, price, category], index) => ({
+          id: `shared-${index}-${name}`,
+          name,
+          price,
+          category: category || guessCategory(name),
+        })),
+      };
+    }
+    return compact;
   } catch {
     try {
       return JSON.parse(decodeURIComponent(value));
@@ -695,7 +725,7 @@ function publishOrder() {
 
   try {
     const url = new URL(window.location.href);
-    url.searchParams.set("order", encodeShareData(buildSharePayload()));
+    url.search = `?order=${encodeShareData(buildSharePayload())}`;
     url.hash = "order";
     els.shareLink.textContent = url.toString();
     els.shareBox.classList.remove("hidden");
