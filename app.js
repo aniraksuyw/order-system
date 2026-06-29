@@ -260,7 +260,6 @@ async function fetchRemoteOrders() {
   if (orderError) throw orderError;
 
   if (!orders.length) {
-    state.orders = [];
     return;
   }
 
@@ -1083,13 +1082,7 @@ els.orderForm.addEventListener("submit", async (event) => {
     createdAt: new Date().toISOString(),
   };
 
-  try {
-    await saveRemoteOrder(order);
-    await fetchRemoteOrders();
-  } catch {
-    state.orders.push(order);
-    showToast("雲端儲存失敗，已暫存在本機");
-  }
+  state.orders.push(order);
 
   els.orderForm.reset();
   document.querySelectorAll("[data-order-item]").forEach((input) => {
@@ -1099,6 +1092,15 @@ els.orderForm.addEventListener("submit", async (event) => {
   renderSummary();
   switchView("summaryView");
   showToast("點餐已送出");
+
+  try {
+    await saveRemoteOrder(order);
+    await fetchRemoteOrders();
+    saveState();
+    renderSummary();
+  } catch {
+    showToast("雲端同步失敗，已先保留在本機");
+  }
 });
 
 els.copyVendorBtn.addEventListener("click", () => copyText(els.vendorText.value, "店家訂單已複製"));
