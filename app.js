@@ -99,19 +99,17 @@ function loadState() {
 }
 
 function encodeShareData(data) {
-  const json = JSON.stringify(data);
-  const bytes = new TextEncoder().encode(json);
-  let binary = "";
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-  return btoa(binary);
+  return encodeURIComponent(JSON.stringify(data));
 }
 
 function decodeShareData(value) {
-  const binary = atob(value);
-  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-  return JSON.parse(new TextDecoder().decode(bytes));
+  try {
+    return JSON.parse(value);
+  } catch {
+    const binary = atob(value);
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes));
+  }
 }
 
 function buildSharePayload() {
@@ -677,12 +675,16 @@ function publishOrder() {
   saveState();
   renderAll();
 
-  const url = new URL(window.location.href);
-  url.hash = `order=${encodeURIComponent(encodeShareData(buildSharePayload()))}`;
-  els.shareLink.textContent = url.toString();
-  els.shareBox.classList.remove("hidden");
-  switchView("orderView");
-  showToast("團購單已建立");
+  try {
+    const url = new URL(window.location.href);
+    url.hash = `order=${encodeShareData(buildSharePayload())}`;
+    els.shareLink.textContent = url.toString();
+    els.shareBox.classList.remove("hidden");
+    switchView("orderView");
+    showToast("團購單已建立");
+  } catch {
+    showToast("團購連結產生失敗，請重新整理後再試");
+  }
 }
 
 async function copyText(text, message) {
