@@ -420,6 +420,11 @@ function setGuestMode(enabled) {
   document.body.classList.toggle("guest-mode", enabled);
 }
 
+function isSharedOrderUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return params.has("g") || params.has("order") || window.location.hash.startsWith("#order");
+}
+
 function guessCategory(name) {
   if (/茶|咖啡|奶|可樂|汁|飲/.test(name)) return "飲料";
   if (/便當|飯|麵|鍋|粥|排|雞|豬|牛|魚/.test(name)) return "主餐";
@@ -1115,8 +1120,8 @@ els.orderForm.addEventListener("submit", async (event) => {
 els.copyVendorBtn.addEventListener("click", () => copyText(els.vendorText.value, "店家訂單已複製"));
 
 async function startApp() {
+  setGuestMode(isSharedOrderUrl());
   const loadedFromSharedLink = await loadSharedOrderFromUrl();
-  setGuestMode(loadedFromSharedLink);
   if (!loadedFromSharedLink) {
     loadState();
   }
@@ -1132,7 +1137,7 @@ async function startApp() {
   renderAll();
   window.setInterval(renderOrderView, 30000);
 
-  if (loadedFromSharedLink || window.location.hash.startsWith("#order")) {
+  if (isGuestMode || loadedFromSharedLink || window.location.hash.startsWith("#order")) {
     switchView("orderView");
   }
 }
