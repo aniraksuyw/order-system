@@ -99,16 +99,20 @@ function loadState() {
 }
 
 function encodeShareData(data) {
-  return encodeURIComponent(JSON.stringify(data));
+  return JSON.stringify(data);
 }
 
 function decodeShareData(value) {
   try {
     return JSON.parse(value);
   } catch {
-    const binary = atob(value);
-    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-    return JSON.parse(new TextDecoder().decode(bytes));
+    try {
+      return JSON.parse(decodeURIComponent(value));
+    } catch {
+      const binary = atob(value);
+      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+      return JSON.parse(new TextDecoder().decode(bytes));
+    }
   }
 }
 
@@ -127,23 +131,37 @@ function buildSharePayload() {
   };
 }
 
-function loadSharedOrderFromHash() {
+function applySharedOrder(sharedOrder) {
+  Object.assign(state, {
+    published: true,
+    shopName: sharedOrder.shopName || "",
+    mealTime: sharedOrder.mealTime || "",
+    deadline: sharedOrder.deadline || "",
+    note: "",
+    menuItems: Array.isArray(sharedOrder.menuItems) ? sharedOrder.menuItems : [],
+    orders: [],
+  });
+  saveState();
+}
+
+function loadSharedOrderFromUrl() {
+  const queryOrder = new URLSearchParams(window.location.search).get("order");
+  if (queryOrder) {
+    try {
+      applySharedOrder(decodeShareData(queryOrder));
+      return true;
+    } catch {
+      showToast("團購連結資料無法讀取");
+      return false;
+    }
+  }
+
   const hash = window.location.hash.slice(1);
   if (!hash.startsWith("order=")) return false;
 
   try {
     const params = new URLSearchParams(hash);
-    const sharedOrder = decodeShareData(params.get("order"));
-    Object.assign(state, {
-      published: true,
-      shopName: sharedOrder.shopName || "",
-      mealTime: sharedOrder.mealTime || "",
-      deadline: sharedOrder.deadline || "",
-      note: "",
-      menuItems: Array.isArray(sharedOrder.menuItems) ? sharedOrder.menuItems : [],
-      orders: [],
-    });
-    saveState();
+    applySharedOrder(decodeShareData(params.get("order")));
     return true;
   } catch {
     showToast("團購連結資料無法讀取");
@@ -677,7 +695,8 @@ function publishOrder() {
 
   try {
     const url = new URL(window.location.href);
-    url.hash = `order=${encodeShareData(buildSharePayload())}`;
+    url.searchParams.set("order", encodeShareData(buildSharePayload()));
+    url.hash = "order";
     els.shareLink.textContent = url.toString();
     els.shareBox.classList.remove("hidden");
     switchView("orderView");
@@ -863,13 +882,13 @@ els.orderForm.addEventListener("submit", (event) => {
 
 els.copyVendorBtn.addEventListener("click", () => copyText(els.vendorText.value, "店家訂單已複製"));
 
-const loadedFromSharedLink = loadSharedOrderFromHash();
+const loadedFromSharedLink = loadSharedOrderFromUrl();
 if (!loadedFromSharedLink) {
   loadState();
 }
 renderAll();
 window.setInterval(renderOrderView, 30000);
 
-if (window.location.hash.startsWith("#order")) {
+if (loadedFromSharedLink || window.location.hash.startsWith("#order")) {
   switchView("orderView");
 }
