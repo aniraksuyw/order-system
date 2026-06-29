@@ -373,6 +373,34 @@ function formatDateTime(value, options = { dateStyle: "short", timeStyle: "short
   return value ? new Date(value).toLocaleString("zh-TW", options) : "";
 }
 
+function formatDateTimeInputValue(date) {
+  const pad = (value) => String(value).padStart(2, "0");
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hour = pad(date.getHours());
+  const minute = pad(date.getMinutes());
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+function snapDateTimeToQuarterHour(input) {
+  if (!input.value) return;
+
+  const date = new Date(input.value);
+  if (Number.isNaN(date.getTime())) return;
+
+  const snappedMinute = Math.round(date.getMinutes() / 15) * 15;
+  date.setSeconds(0, 0);
+
+  if (snappedMinute === 60) {
+    date.setHours(date.getHours() + 1, 0);
+  } else {
+    date.setMinutes(snappedMinute);
+  }
+
+  input.value = formatDateTimeInputValue(date);
+}
+
 function isOrderClosed() {
   if (!state.deadline) return false;
   const deadlineTime = new Date(state.deadline).getTime();
@@ -1055,6 +1083,18 @@ els.resetBtn.addEventListener("click", () => {
 });
 
 els.copyShareBtn.addEventListener("click", () => copyText(els.shareLink.textContent, "連結已複製"));
+
+els.mealTime.addEventListener("change", () => {
+  snapDateTimeToQuarterHour(els.mealTime);
+  state.mealTime = els.mealTime.value;
+  saveState();
+});
+
+els.mealTime.addEventListener("blur", () => {
+  snapDateTimeToQuarterHour(els.mealTime);
+  state.mealTime = els.mealTime.value;
+  saveState();
+});
 
 els.orderForm.addEventListener("submit", async (event) => {
   event.preventDefault();
