@@ -98,6 +98,61 @@ function loadState() {
   }
 }
 
+function encodeShareData(data) {
+  const json = JSON.stringify(data);
+  const bytes = new TextEncoder().encode(json);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary);
+}
+
+function decodeShareData(value) {
+  const binary = atob(value);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function buildSharePayload() {
+  return {
+    published: true,
+    shopName: state.shopName,
+    mealTime: state.mealTime,
+    deadline: state.deadline,
+    menuItems: state.menuItems.map((item) => ({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      price: item.price,
+    })),
+  };
+}
+
+function loadSharedOrderFromHash() {
+  const hash = window.location.hash.slice(1);
+  if (!hash.startsWith("order=")) return false;
+
+  try {
+    const params = new URLSearchParams(hash);
+    const sharedOrder = decodeShareData(params.get("order"));
+    Object.assign(state, {
+      published: true,
+      shopName: sharedOrder.shopName || "",
+      mealTime: sharedOrder.mealTime || "",
+      deadline: sharedOrder.deadline || "",
+      note: "",
+      menuItems: Array.isArray(sharedOrder.menuItems) ? sharedOrder.menuItems : [],
+      orders: [],
+    });
+    saveState();
+    return true;
+  } catch {
+    showToast("團購連結資料無法讀取");
+    return false;
+  }
+}
+
 function currency(value) {
   return `$${Number(value || 0).toLocaleString("zh-TW")}`;
 }
@@ -623,7 +678,7 @@ function publishOrder() {
   renderAll();
 
   const url = new URL(window.location.href);
-  url.hash = "order";
+  url.hash = `order=${encodeURIComponent(encodeShareData(buildSharePayload()))}`;
   els.shareLink.textContent = url.toString();
   els.shareBox.classList.remove("hidden");
   switchView("orderView");
@@ -806,10 +861,13 @@ els.orderForm.addEventListener("submit", (event) => {
 
 els.copyVendorBtn.addEventListener("click", () => copyText(els.vendorText.value, "店家訂單已複製"));
 
-loadState();
+const loadedFromSharedLink = loadSharedOrderFromHash();
+if (!loadedFromSharedLink) {
+  loadState();
+}
 renderAll();
 window.setInterval(renderOrderView, 30000);
 
-if (window.location.hash === "#order") {
+if (window.location.hash.startsWith("#order")) {
   switchView("orderView");
 }
