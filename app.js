@@ -901,8 +901,8 @@ async function publishOrder() {
     saveState();
     renderAll();
     els.shareBox.classList.remove("hidden");
-    switchView("orderView");
-    showToast("團購單已建立");
+    switchView("hostView");
+    showToast("團購單已建立，請複製連結給同事");
   } catch {
     showToast("團購連結產生失敗，請重新整理後再試");
   }
